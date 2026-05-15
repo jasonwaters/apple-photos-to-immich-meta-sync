@@ -1,0 +1,24 @@
+services:
+  immich-favorite-sync:
+    build: .
+    container_name: immich-favorite-sync
+    restart: "no"
+    env_file:
+      - .env
+    volumes:
+      # Mount local macOS Photos database (read-only) for auth-free favorite reads.
+      - "/Users/your-user/Pictures/Photos Library.photoslibrary/database/Photos.sqlite:/photos-library/Photos.sqlite:ro"
+      # Persist favorite metadata between test runs.
+      - ./.cache:/cache
+    
+    # Example: Run on schedule using cron in host or NAS scheduler
+    # For one-shot execution, set restart: "no" and trigger via docker-compose up
+    # For continuous mode, add --watch flag and set restart: unless-stopped
+
+# Example usage:
+# 1. Copy this file to docker-compose.yml
+# 2. Copy .env.example to .env and fill in your values
+# 3. Update volume paths to match your setup
+# 4. Dry run: docker-compose run --rm immich-favorite-sync
+# 5. Apply changes: docker-compose run --rm immich-favorite-sync --apply
+# 6. Schedule with cron: 0 */6 * * * cd /path/to/this && docker-compose up
