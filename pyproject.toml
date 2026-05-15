@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "immich-favorite-sync"
+name = "apple-photos-to-immich-meta-sync"
 version = "0.1.0"
 description = "Sync Photos favorites to Immich"
 readme = "README.md"
@@ -27,7 +27,7 @@ dev = [
 ]
 
 [project.scripts]
-immich-favorite-sync = "immich_favorite_sync.__main__:main"
+apple-photos-to-immich-meta-sync = "immich_favorite_sync.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/immich_favorite_sync"]

@@ -1,1 +1,1 @@
-"""Test package for immich-favorite-sync."""
+"""Test package for apple-photos-to-immich-meta-sync."""

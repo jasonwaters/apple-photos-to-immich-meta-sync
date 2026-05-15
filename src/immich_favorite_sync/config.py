@@ -1,4 +1,4 @@
-"""Configuration management for immich-favorite-sync."""
+"""Configuration management for apple-photos-to-immich-meta-sync."""
 
 from pathlib import Path
 

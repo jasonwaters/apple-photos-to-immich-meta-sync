@@ -34,6 +34,16 @@ class ImmichAsset:
         return f"{self.original_file_name} (id: {self.id[:8]}...)"
 
 
+@dataclass
+class ImmichAlbum:
+    """Metadata for an Immich album."""
+
+    id: str
+    album_name: str
+    asset_count: int
+    assets: list[ImmichAsset]
+
+
 class ImmichClient:
     """Client for Immich API operations."""
 
@@ -135,6 +145,110 @@ class ImmichClient:
             logger.error(f"Error fetching asset {asset_id}: {e}")
             raise
 
+    def get_albums(self) -> list[ImmichAlbum]:
+        """Return Immich albums visible to the API key."""
+        try:
+            response = self._client.get(f"{self.base_url}/api/albums")
+            response.raise_for_status()
+
+            album_payloads = response.json()
+            if not isinstance(album_payloads, list):
+                raise RuntimeError("Immich returned invalid album list")
+
+            albums = []
+            for album_data in album_payloads:
+                album = self._parse_album(album_data)
+                if album is not None:
+                    albums.append(album)
+
+            return albums
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error fetching albums: {e.response.status_code}")
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching albums: {e}")
+            raise
+
+    def find_album_by_name(self, album_name: str) -> ImmichAlbum | None:
+        """Find one Immich album by exact album name."""
+        albums = self.get_albums()
+        exact_matches = [album for album in albums if album.album_name == album_name]
+        if len(exact_matches) > 1:
+            raise RuntimeError(f"Multiple Immich albums named {album_name!r}; cannot choose safely")
+        if exact_matches:
+            return exact_matches[0]
+
+        casefolded_name = album_name.casefold()
+        casefolded_matches = [album for album in albums if album.album_name.casefold() == casefolded_name]
+        if len(casefolded_matches) > 1:
+            raise RuntimeError(f"Multiple Immich albums named like {album_name!r}; cannot choose safely")
+
+        return casefolded_matches[0] if casefolded_matches else None
+
+    def find_album_by_id(self, album_id: str) -> ImmichAlbum | None:
+        """Find one Immich album by ID."""
+        for album in self.get_albums():
+            if album.id == album_id:
+                return album
+
+        return None
+
+    def create_album(self, album_name: str, asset_ids: list[str] | None = None) -> ImmichAlbum:
+        """Create an Immich album."""
+        payload: dict[str, object] = {"albumName": album_name}
+        if asset_ids:
+            payload["assetIds"] = asset_ids
+
+        try:
+            response = self._client.post(f"{self.base_url}/api/albums", json=payload)
+            response.raise_for_status()
+
+            album = self._parse_album(response.json())
+            if album is None:
+                raise RuntimeError(f"Immich returned invalid album details for {album_name!r}")
+
+            return album
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error creating album {album_name}: {e.response.status_code} - {e.response.text}")
+            raise RuntimeError(f"Failed to create Immich album {album_name!r}: {e.response.status_code}") from e
+        except Exception as e:
+            logger.error(f"Error creating album {album_name}: {e}")
+            raise RuntimeError(f"Failed to create Immich album {album_name!r}: {e}") from e
+
+    def add_assets_to_album(self, album_id: str, asset_ids: list[str]) -> int:
+        """Add assets to an Immich album and return count successfully present."""
+        if not asset_ids:
+            return 0
+
+        try:
+            response = self._client.put(
+                f"{self.base_url}/api/albums/{album_id}/assets",
+                json={"ids": asset_ids},
+            )
+            response.raise_for_status()
+
+            results = response.json()
+            if not isinstance(results, list):
+                return len(asset_ids)
+
+            successful_count = 0
+            for result in results:
+                if not isinstance(result, dict):
+                    continue
+                if result.get("success") or result.get("error") == "duplicate":
+                    successful_count += 1
+
+            return successful_count
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error adding assets to album {album_id}: {e.response.status_code} - {e.response.text}")
+            raise RuntimeError(f"Failed to add assets to Immich album {album_id}: {e.response.status_code}") from e
+        except Exception as e:
+            logger.error(f"Error adding assets to album {album_id}: {e}")
+            raise RuntimeError(f"Failed to add assets to Immich album {album_id}: {e}") from e
+
     def update_favorites(self, asset_ids: list[str], is_favorite: bool = True) -> None:
         """Update favorite status for multiple assets.
 
@@ -214,6 +328,26 @@ class ImmichClient:
         except Exception as e:
             logger.warning(f"Failed to parse asset data: {e}")
             return None
+
+    def _parse_album(self, album_data: dict) -> ImmichAlbum | None:
+        """Parse album data from API response."""
+        album_id = album_data.get("id")
+        album_name = album_data.get("albumName")
+        if not album_id or not album_name:
+            return None
+
+        assets = []
+        for asset_data in album_data.get("assets") or []:
+            asset = self._parse_asset(asset_data)
+            if asset is not None:
+                assets.append(asset)
+
+        return ImmichAlbum(
+            id=album_id,
+            album_name=album_name,
+            asset_count=album_data.get("assetCount", len(assets)),
+            assets=assets,
+        )
 
     def _parse_datetime(self, value: str | None) -> datetime | None:
         """Parse an Immich API datetime string."""

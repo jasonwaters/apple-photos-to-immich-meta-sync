@@ -1,12 +1,12 @@
-"""Shared domain models for favorite sync."""
+"""Shared domain models for Photos-to-Immich sync."""
 
 from dataclasses import dataclass
 from datetime import datetime
 
 
 @dataclass
-class FavoritePhoto:
-    """Metadata for a favorite photo from a configured source."""
+class PhotoAsset:
+    """Metadata for a photo asset from the local Photos library."""
 
     id: str
     filename: str
@@ -30,7 +30,7 @@ class FavoritePhoto:
         return f"{self.filename} ({date_str}{library})"
 
     def to_dict(self) -> dict:
-        """Serialize favorite metadata for local cache storage."""
+        """Serialize photo metadata for local cache storage."""
         return {
             "id": self.id,
             "filename": self.filename,
@@ -49,8 +49,8 @@ class FavoritePhoto:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "FavoritePhoto":
-        """Deserialize favorite metadata from local cache storage."""
+    def from_dict(cls, data: dict) -> "PhotoAsset":
+        """Deserialize photo metadata from local cache storage."""
         dimensions = data.get("dimensions")
 
         return cls(
@@ -68,4 +68,79 @@ class FavoritePhoto:
             lens_model=data.get("lens_model"),
             cloud_master_guid=data.get("cloud_master_guid"),
             uti=data.get("uti"),
+        )
+
+
+class FavoritePhoto(PhotoAsset):
+    """Backward-compatible name for favorite sync assets."""
+
+
+@dataclass
+class PhotoAlbumSummary:
+    """A non-empty album from the local Photos library."""
+
+    id: str
+    uuid: str
+    name: str
+    path: str
+    asset_count: int
+    photo_count: int
+    video_count: int
+
+    @property
+    def display_name(self) -> str:
+        """Return the most helpful human-readable album name."""
+        return self.path or self.name
+
+
+@dataclass
+class PhotoAlbumMapping:
+    """Mapping from a Photos album to an Immich album."""
+
+    photos_album_uuid: str | None
+    photos_album_path: str | None
+    photos_album_name: str
+    immich_album_name: str
+    immich_album_id: str | None = None
+    last_seen_photos_album_name: str | None = None
+    last_seen_photos_album_path: str | None = None
+    last_synced_at: str | None = None
+
+    def to_dict(self) -> dict:
+        """Serialize album mapping for config storage."""
+        return {
+            "photos_album_uuid": self.photos_album_uuid,
+            "photos_album_path": self.photos_album_path,
+            "photos_album_name": self.photos_album_name,
+            "immich_album_name": self.immich_album_name,
+            "immich_album_id": self.immich_album_id,
+            "last_seen_photos_album_name": self.last_seen_photos_album_name,
+            "last_seen_photos_album_path": self.last_seen_photos_album_path,
+            "last_synced_at": self.last_synced_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "PhotoAlbumMapping":
+        """Deserialize album mapping from config storage."""
+        return cls(
+            photos_album_uuid=data.get("photos_album_uuid"),
+            photos_album_path=data.get("photos_album_path"),
+            photos_album_name=data["photos_album_name"],
+            immich_album_name=data["immich_album_name"],
+            immich_album_id=data.get("immich_album_id"),
+            last_seen_photos_album_name=data.get("last_seen_photos_album_name"),
+            last_seen_photos_album_path=data.get("last_seen_photos_album_path"),
+            last_synced_at=data.get("last_synced_at"),
+        )
+
+    @classmethod
+    def from_album(cls, album: PhotoAlbumSummary, immich_album_name: str | None = None) -> "PhotoAlbumMapping":
+        """Create a mapping from a selected Photos album."""
+        return cls(
+            photos_album_uuid=album.uuid,
+            photos_album_path=album.path,
+            photos_album_name=album.name,
+            immich_album_name=immich_album_name or album.name,
+            last_seen_photos_album_name=album.name,
+            last_seen_photos_album_path=album.path,
         )

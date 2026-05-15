@@ -17,4 +17,4 @@ RUN useradd -m -u 1000 syncuser && \
 
 USER syncuser
 
-ENTRYPOINT ["immich-favorite-sync"]
+ENTRYPOINT ["apple-photos-to-immich-meta-sync"]

@@ -1,3 +1,3 @@
-"""Immich Favorite Sync - Sync macOS Photos favorites to Immich."""
+"""Apple Photos to Immich Meta Sync."""
 
 __version__ = "0.1.0"

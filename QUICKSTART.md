@@ -38,25 +38,54 @@ docker pull ghcr.io/jasonwaters/apple-photos-to-immich-meta-sync:latest
 All favorites:
 
 ```bash
-uv run immich-favorite-sync --refresh-cache
+uv run apple-photos-to-immich-meta-sync --refresh-cache
 ```
 
 Random deterministic sample:
 
 ```bash
-uv run immich-favorite-sync --sample-size 100 --sample-seed 1 --refresh-cache
+uv run apple-photos-to-immich-meta-sync --sample-size 100 --sample-seed 1 --refresh-cache
 ```
 
 Single filename:
 
 ```bash
-uv run immich-favorite-sync --only-filename IMG_5743.HEIC --refresh-cache
+uv run apple-photos-to-immich-meta-sync --only-filename IMG_5743.HEIC --refresh-cache
 ```
 
 Docker:
 
 ```bash
-docker-compose run --rm immich-favorite-sync --refresh-cache
+docker-compose run --rm apple-photos-to-immich-meta-sync --refresh-cache
+```
+
+## Album Sync
+
+List available non-empty Apple Photos albums:
+
+```bash
+uv run apple-photos-to-immich-meta-sync albums --list
+```
+
+First run: select albums interactively and seed `.cache/album-sync.json`. When an Immich album is found or created, the config stores its ID so future runs still work after an Immich-side rename:
+
+```bash
+uv run apple-photos-to-immich-meta-sync albums --interactive
+```
+
+New Immich album names are derived from the Apple Photos path, such as `[Family Photos] 2017-03 - Lehi` or `[kelly] (Scott Kelly) All Scott`.
+Duplicate Photos album rows with the same path are combined into one shared Immich album target.
+
+Later runs: replay the saved config non-interactively:
+
+```bash
+uv run apple-photos-to-immich-meta-sync albums
+```
+
+Apply album changes:
+
+```bash
+uv run apple-photos-to-immich-meta-sync --apply albums
 ```
 
 ## Apply
@@ -64,11 +93,11 @@ docker-compose run --rm immich-favorite-sync --refresh-cache
 Only apply after reviewing the planned favorites table:
 
 ```bash
-uv run immich-favorite-sync --apply
+uv run apple-photos-to-immich-meta-sync --apply
 ```
 
 ```bash
-docker-compose run --rm immich-favorite-sync --apply
+docker-compose run --rm apple-photos-to-immich-meta-sync --apply
 ```
 
 ## Verify
@@ -76,8 +105,8 @@ docker-compose run --rm immich-favorite-sync --apply
 ```bash
 uv run pytest
 uv run ruff check .
-uv run immich-favorite-sync --help
-docker build -t immich-favorite-sync .
+uv run apple-photos-to-immich-meta-sync --help
+docker build -t apple-photos-to-immich-meta-sync .
 ```
 
 ## GitHub Actions
@@ -90,5 +119,6 @@ docker build -t immich-favorite-sync .
 - Dry run is the default.
 - The app only sets favorites in Immich.
 - It never removes Immich favorites.
+- Album sync is add-only and never removes assets from Immich albums.
 - `Photos.sqlite` is opened read-only.
 - There is no Apple auth or iCloud web API code.

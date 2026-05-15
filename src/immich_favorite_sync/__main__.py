@@ -1,5 +1,6 @@
-"""Command-line interface for immich-favorite-sync."""
+"""Command-line interface for apple-photos-to-immich-meta-sync."""
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -9,9 +10,11 @@ from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.table import Table
 
+from .album_sync import AlbumSyncer, AlbumSyncStats
 from .config import Config
 from .immich_client import ImmichClient
 from .local_photos_client import LocalPhotosLibraryClient
+from .models import PhotoAlbumSummary
 from .sync import FavoriteSyncer, SyncStats
 
 console = Console()
@@ -38,8 +41,8 @@ def print_banner() -> None:
     """Print application banner."""
     console.print(
         Panel.fit(
-            "[bold cyan]Immich Favorite Sync[/bold cyan]\n"
-            "Sync Photos favorites to Immich",
+            "[bold cyan]Apple Photos to Immich Meta Sync[/bold cyan]\n"
+            "Sync Photos favorites and albums to Immich",
             border_style="cyan",
         )
     )
@@ -154,16 +157,101 @@ def default_favorites_cache_path() -> Path:
     return cache_dir / "local-photos-favorites.json"
 
 
-def main() -> int:
-    """Main entry point.
+def default_album_config_path() -> Path:
+    """Choose an album mapping config path that works in Docker and local development."""
+    cache_dir = Path("/cache") if Path("/cache").exists() else Path(".cache")
+    return cache_dir / "album-sync.json"
 
-    Returns:
-        Exit code (0 for success, non-zero for error)
-    """
-    import argparse
 
+def print_album_list(albums: list[PhotoAlbumSummary]) -> None:
+    """Print available Photos albums for selection."""
+    duplicates = _duplicate_album_names(albums)
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("#", justify="right")
+    table.add_column("Album")
+    table.add_column("Path")
+    table.add_column("Assets", justify="right")
+    table.add_column("Notes")
+
+    for index, album in enumerate(albums, start=1):
+        notes = "duplicate name" if album.name in duplicates else ""
+        table.add_row(str(index), album.name, album.path, str(album.asset_count), notes)
+
+    console.print(table)
+
+
+def print_album_summary(stats: AlbumSyncStats, dry_run: bool) -> None:
+    """Print album sync summary."""
+    console.print()
+    console.rule("[bold]Album Sync Summary", style="cyan")
+
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right", style="bold")
+    table.add_row("Album mappings", str(stats.total_mappings))
+    table.add_row("Albums found", str(stats.albums_found))
+    table.add_row("Albums created/planned", str(stats.albums_created))
+    table.add_row("Photos assets seen", str(stats.photos_assets_seen))
+    table.add_row("Matched assets", str(stats.matched_assets))
+    table.add_row("Assets to add", str(stats.assets_to_add))
+    if not dry_run:
+        table.add_row("Assets added", str(stats.assets_added))
+    table.add_row("Skipped assets", str(stats.skipped_assets))
+    table.add_row("Errors", str(stats.errors))
+    console.print(table)
+
+    if dry_run:
+        console.print("[bold yellow]DRY RUN:[/bold yellow] No Immich album changes were applied", style="yellow")
+        console.print("[dim]Run with --apply to create albums and add assets[/dim]")
+
+
+def select_albums_interactively(albums: list[PhotoAlbumSummary]) -> list[PhotoAlbumSummary]:
+    """Prompt the user to select Photos albums by index."""
+    if not albums:
+        return []
+
+    print_album_list(albums)
+    selection = console.input("\nSelect album numbers or ranges (example: 1,3,5-8): ").strip()
+    selected_indices = _parse_selection(selection, len(albums))
+    return [albums[index - 1] for index in selected_indices]
+
+
+def _parse_selection(selection: str, max_index: int) -> list[int]:
+    """Parse comma-separated indexes and ranges."""
+    indexes = []
+    for raw_part in selection.split(","):
+        part = raw_part.strip()
+        if not part:
+            continue
+
+        if "-" in part:
+            start_text, end_text = part.split("-", maxsplit=1)
+            start = int(start_text)
+            end = int(end_text)
+            indexes.extend(range(start, end + 1))
+        else:
+            indexes.append(int(part))
+
+    deduped = list(dict.fromkeys(indexes))
+    invalid = [index for index in deduped if index < 1 or index > max_index]
+    if invalid:
+        raise ValueError(f"Album selection out of range: {invalid}")
+
+    return deduped
+
+
+def _duplicate_album_names(albums: list[PhotoAlbumSummary]) -> set[str]:
+    """Return album leaf names that appear more than once."""
+    counts: dict[str, int] = {}
+    for album in albums:
+        counts[album.name] = counts.get(album.name, 0) + 1
+    return {name for name, count in counts.items() if count > 1}
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI parser."""
     parser = argparse.ArgumentParser(
-        description="Sync macOS Photos favorites to Immich",
+        description="Sync macOS Photos favorites and albums to Immich",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -220,7 +308,41 @@ def main() -> int:
         action="store_true",
         help="Refresh the favorites cache before matching",
     )
+    subparsers = parser.add_subparsers(dest="command")
 
+    subparsers.add_parser("favorites", help="Sync Photos favorites to Immich favorites")
+    albums_parser = subparsers.add_parser("albums", help="Sync Photos albums to Immich albums")
+    albums_parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List non-empty Photos albums and exit",
+    )
+    albums_parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Interactively select Photos albums to sync and save mappings",
+    )
+    albums_parser.add_argument(
+        "--config",
+        type=Path,
+        help="Album mapping config path (default: .cache/album-sync.json or /cache/album-sync.json)",
+    )
+    albums_parser.add_argument(
+        "--no-save-config",
+        action="store_true",
+        help="Do not save interactive album selections to the mapping config",
+    )
+
+    return parser
+
+
+def main() -> int:
+    """Main entry point.
+
+    Returns:
+        Exit code (0 for success, non-zero for error)
+    """
+    parser = build_parser()
     args = parser.parse_args()
 
     # Load configuration
@@ -244,6 +366,7 @@ def main() -> int:
         favorites_cache_path = args.favorites_cache
         if favorites_cache_path is None:
             favorites_cache_path = default_favorites_cache_path()
+        album_config_path = args.config if args.command == "albums" and args.config else default_album_config_path()
 
     except Exception as e:
         console.print(f"[bold red]Configuration error:[/bold red] {e}")
@@ -279,17 +402,26 @@ def main() -> int:
             api_key=config.immich_api_key,
         )
 
-        syncer = FavoriteSyncer(
-            favorite_source=photos_library_client,
-            immich_client=immich_client,
-            batch_size=config.batch_size,
-            dry_run=config.dry_run,
-            sample_size=args.sample_size,
-            sample_seed=args.sample_seed,
-            only_filename=args.only_filename,
-            favorites_cache_path=favorites_cache_path,
-            refresh_cache=args.refresh_cache,
-        )
+        if args.command == "albums":
+            syncer = AlbumSyncer(
+                photos_client=photos_library_client,
+                immich_client=immich_client,
+                config_path=album_config_path,
+                batch_size=config.batch_size,
+                dry_run=config.dry_run,
+            )
+        else:
+            syncer = FavoriteSyncer(
+                favorite_source=photos_library_client,
+                immich_client=immich_client,
+                batch_size=config.batch_size,
+                dry_run=config.dry_run,
+                sample_size=args.sample_size,
+                sample_seed=args.sample_seed,
+                only_filename=args.only_filename,
+                favorites_cache_path=favorites_cache_path,
+                refresh_cache=args.refresh_cache,
+            )
 
     except Exception as e:
         console.print(f"[bold red]Initialization error:[/bold red] {e}")
@@ -298,8 +430,28 @@ def main() -> int:
 
     # Perform sync
     try:
-        stats = syncer.sync()
-        print_summary(stats, config.dry_run)
+        if args.command == "albums":
+            if args.list:
+                albums = photos_library_client.list_albums()
+                print_album_list(albums)
+                return 0
+
+            if args.interactive:
+                albums = photos_library_client.list_albums()
+                selected_albums = select_albums_interactively(albums)
+                if not selected_albums:
+                    console.print("[yellow]No albums selected[/yellow]")
+                    return 0
+                stats = syncer.sync_selected(
+                    selected_albums,
+                    save_config=not args.no_save_config,
+                )
+            else:
+                stats = syncer.sync_configured()
+            print_album_summary(stats, config.dry_run)
+        else:
+            stats = syncer.sync()
+            print_summary(stats, config.dry_run)
 
         # Return error if there were failures
         if stats.errors > 0:
