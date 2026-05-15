@@ -1,6 +1,6 @@
 services:
   immich-favorite-sync:
-    image: ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
+    image: ghcr.io/jasonwaters/apple-photos-to-immich-meta-sync:latest
     # For local development, replace the image line with:
     # build: .
     container_name: immich-favorite-sync

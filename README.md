@@ -1,7 +1,7 @@
 # Immich Favorite Sync
 
-[![CI](https://github.com/jasonwaters/icloud-to-immich-meta-sync/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jasonwaters/icloud-to-immich-meta-sync/actions/workflows/ci.yml)
-[![Docker](https://github.com/jasonwaters/icloud-to-immich-meta-sync/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/jasonwaters/icloud-to-immich-meta-sync/actions/workflows/docker.yml)
+[![CI](https://github.com/jasonwaters/apple-photos-to-immich-meta-sync/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jasonwaters/apple-photos-to-immich-meta-sync/actions/workflows/ci.yml)
+[![Docker](https://github.com/jasonwaters/apple-photos-to-immich-meta-sync/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/jasonwaters/apple-photos-to-immich-meta-sync/actions/workflows/docker.yml)
 
 Sync favorites from a local macOS Photos library into Immich.
 
@@ -61,7 +61,7 @@ For local runs without Docker, point `PHOTOS_SQLITE_PATH` at the host path direc
 Published images are available from GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
+docker pull ghcr.io/jasonwaters/apple-photos-to-immich-meta-sync:latest
 ```
 
 Use the published image in `docker-compose.yml`:
@@ -69,7 +69,7 @@ Use the published image in `docker-compose.yml`:
 ```yaml
 services:
   immich-favorite-sync:
-    image: ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
+    image: ghcr.io/jasonwaters/apple-photos-to-immich-meta-sync:latest
     env_file:
       - .env
     volumes:

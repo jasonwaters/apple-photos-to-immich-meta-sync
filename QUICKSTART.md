@@ -21,7 +21,7 @@ DRY_RUN=true
 For Docker, keep `PHOTOS_SQLITE_PATH=/photos-library/Photos.sqlite` in `.env` and mount the host database read-only:
 
 ```yaml
-image: ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
+image: ghcr.io/jasonwaters/apple-photos-to-immich-meta-sync:latest
 volumes:
   - "/Users/you/Pictures/Photos Library.photoslibrary/database/Photos.sqlite:/photos-library/Photos.sqlite:ro"
   - ./.cache:/cache
@@ -30,7 +30,7 @@ volumes:
 Pull the published image:
 
 ```bash
-docker pull ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
+docker pull ghcr.io/jasonwaters/apple-photos-to-immich-meta-sync:latest
 ```
 
 ## Dry Run First
