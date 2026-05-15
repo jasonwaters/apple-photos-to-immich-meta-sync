@@ -1,6 +1,8 @@
 services:
   immich-favorite-sync:
-    build: .
+    image: ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
+    # For local development, replace the image line with:
+    # build: .
     container_name: immich-favorite-sync
     restart: "no"
     env_file:

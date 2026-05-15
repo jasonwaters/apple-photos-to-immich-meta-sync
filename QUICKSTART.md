@@ -21,9 +21,16 @@ DRY_RUN=true
 For Docker, keep `PHOTOS_SQLITE_PATH=/photos-library/Photos.sqlite` in `.env` and mount the host database read-only:
 
 ```yaml
+image: ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
 volumes:
   - "/Users/you/Pictures/Photos Library.photoslibrary/database/Photos.sqlite:/photos-library/Photos.sqlite:ro"
   - ./.cache:/cache
+```
+
+Pull the published image:
+
+```bash
+docker pull ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
 ```
 
 ## Dry Run First
@@ -70,7 +77,13 @@ docker-compose run --rm immich-favorite-sync --apply
 uv run pytest
 uv run ruff check .
 uv run immich-favorite-sync --help
+docker build -t immich-favorite-sync .
 ```
+
+## GitHub Actions
+
+- `CI` runs Ruff and pytest on pull requests and pushes to `main`.
+- `Docker` builds images on pull requests and publishes multi-platform GHCR images on `main`, tags, and manual runs.
 
 ## Safety Notes
 

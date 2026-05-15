@@ -1,5 +1,8 @@
 # Immich Favorite Sync
 
+[![CI](https://github.com/jasonwaters/icloud-to-immich-meta-sync/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jasonwaters/icloud-to-immich-meta-sync/actions/workflows/ci.yml)
+[![Docker](https://github.com/jasonwaters/icloud-to-immich-meta-sync/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/jasonwaters/icloud-to-immich-meta-sync/actions/workflows/docker.yml)
+
 Sync favorites from a local macOS Photos library into Immich.
 
 The app reads `Photos.sqlite` directly and marks matching Immich assets as favorites. It never talks to Apple's web APIs, never manages Apple credentials, and never removes existing Immich favorites.
@@ -52,6 +55,29 @@ volumes:
 ```
 
 For local runs without Docker, point `PHOTOS_SQLITE_PATH` at the host path directly.
+
+## Docker Image
+
+Published images are available from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
+```
+
+Use the published image in `docker-compose.yml`:
+
+```yaml
+services:
+  immich-favorite-sync:
+    image: ghcr.io/jasonwaters/icloud-to-immich-meta-sync:latest
+    env_file:
+      - .env
+    volumes:
+      - "/Users/you/Pictures/Photos Library.photoslibrary/database/Photos.sqlite:/photos-library/Photos.sqlite:ro"
+      - ./.cache:/cache
+```
+
+Images are tagged with `latest` for the default branch, branch names, `sha-<commit>`, and semantic version tags such as `v0.1.0`.
 
 ## Usage
 
@@ -130,9 +156,14 @@ Candidates are then scored using date, dimensions, file size, path date, GPS, an
 uv sync --extra dev
 uv run pytest
 uv run ruff check .
+docker build -t immich-favorite-sync .
 ```
 
 The test suite includes regression coverage for local Photos extraction, hidden/trashed filtering, filename variants, case-sensitive duplicate filenames, and dry-run planning.
+
+## CI and Publishing
+
+GitHub Actions runs lint and tests on pull requests and pushes to `main`. The Docker workflow builds images on pull requests and publishes multi-platform `linux/amd64` and `linux/arm64` images to GHCR on `main`, tags, and manual dispatches.
 
 ## Troubleshooting
 

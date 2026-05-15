@@ -21,6 +21,7 @@ uv sync --extra dev
 uv run pytest
 uv run ruff check .
 uv run immich-favorite-sync --help
+docker build -t immich-favorite-sync .
 ```
 
 ## Code Style
@@ -30,6 +31,7 @@ uv run immich-favorite-sync --help
 - Add regression tests for every matching bug or edge case.
 - Use structured APIs for SQLite, JSON, and HTTP; avoid ad hoc string parsing when a typed or structured option exists.
 - Keep docs aligned with the local-only workflow and current CLI flags.
+- Keep GitHub Actions aligned with local verification: CI should run Ruff and pytest; Docker publishing should build PRs and publish GHCR images only on trusted events.
 
 ## Safety Rules
 
